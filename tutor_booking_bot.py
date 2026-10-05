@@ -818,11 +818,11 @@ async def clear_day(
 
 
 # ====================== ЗАПУСК ======================
+import asyncio
+
+asyncio.set_event_loop(asyncio.new_event_loop())
 
 def main():
-
-    # Перевіряємо, чи Render
-    # передав BOT_TOKEN.
 
     if not BOT_TOKEN:
 
