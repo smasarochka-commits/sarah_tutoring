@@ -531,17 +531,17 @@ if not data["slots"][day]:
         "created_at": datetime.now().isoformat()
     }
 
-    data["bookings"].append(
-        booking
-    )
+         data["bookings"].append(
+             booking
+        )
 
-    save_data(data)
+        save_data(data)
 
-    nice_day = format_date(day)
+        nice_day = format_date(day)
 
-    # Підтвердження учню.
+        # Підтвердження учню.
 
-    await query.edit_message_text(
+        await query.edit_message_text(
         f"✅ Готово!\n\n"
         f"Тебе записано:\n"
         f"👤 Ім'я: {name}\n"
