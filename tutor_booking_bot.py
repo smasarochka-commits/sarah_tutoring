@@ -82,9 +82,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /start"""
     user = update.effective_user
     text = (
+            text = (
         f"Привіт, {user.first_name}! 👋\n\n"
-        "Я бот для запису на уроки англійської.\n\n"
+        "Я бот для запису на уроки англійської до Сари.\n\n"
         "Щоб записатися, натисни кнопку нижче або напиши /book"
+    )
     )
     keyboard = [[InlineKeyboardButton("📝 Записатися", callback_data="start_booking")]]
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
