@@ -90,7 +90,7 @@ def save_data(data):
         raise
 
 
-# ====================== СЛОТИ ======================
+# ====================== СЛОТЫ ======================
 
 
 def get_free_days():
@@ -443,7 +443,7 @@ async def receive_time(
 
     data = load_data()
 
-    # Перевіряємо, чи слот ще вільний
+    # Проверяем, что выбранный слот ещё свободен
     if (
         day not in data["slots"]
         or time_str not in data["slots"][day]
@@ -455,14 +455,9 @@ async def receive_time(
 
         return ConversationHandler.END
 
-    # ==================================================
-    # ВАЖНО:
-    # УРОК ДЛИТСЯ 60 МИНУТ.
-    #
-    # После бронирования выбранного времени
-    # автоматически удаляем все слоты,
-    # которые пересекаются с этим часом.
-    # ==================================================
+    # ==============================
+    # УРОК ДЛИТСЯ 60 МИНУТ
+    # ==============================
 
     # Удаляем выбранный слот
     data["slots"][day].remove(
@@ -481,6 +476,8 @@ async def receive_time(
 
     remaining_times = []
 
+    # Удаляем все слоты, которые
+    # пересекаются с этим 60-минутным уроком.
     for slot in data["slots"][day]:
 
         slot_time = datetime.strptime(
@@ -493,8 +490,6 @@ async def receive_time(
             + timedelta(minutes=60)
         )
 
-        # Оставляем слот только если
-        # он НЕ пересекается с забронированным уроком.
         if (
             slot_time >= lesson_end
             or slot_end <= selected_time
@@ -508,9 +503,9 @@ async def receive_time(
     if not data["slots"][day]:
         del data["slots"][day]
 
-    # ======================
+    # ==============================
     # СОЗДАЁМ ЗАПИСЬ
-    # ======================
+    # ==============================
 
     booking = {
         "name": name,
@@ -532,9 +527,18 @@ async def receive_time(
 
     nice_day = format_date(day)
 
-    # ======================
-    # СООБЩЕНИЕ УЧЕНИКУ
-    # ======================
+    # ==============================
+    # ПОДТВЕРЖДЕНИЕ + КНОПКА
+    # ==============================
+
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                "📝 Записатися ще раз",
+                callback_data="start_booking"
+            )
+        ]
+    ]
 
     await query.edit_message_text(
         f"✅ Готово!\n\n"
@@ -542,12 +546,15 @@ async def receive_time(
         f"👤 Ім'я: {name}\n"
         f"📅 Дата: {nice_day}\n"
         f"🕐 Час: {time_str}\n\n"
-        f"До зустрічі на уроці! 🌟"
+        f"До зустрічі на уроці! 🌟",
+        reply_markup=InlineKeyboardMarkup(
+            keyboard
+        )
     )
 
-    # ======================
+    # ==============================
     # СООБЩЕНИЕ АДМИНУ
-    # ======================
+    # ==============================
 
     admin_text = (
         f"🔔 Новий запис!\n\n"
@@ -825,7 +832,7 @@ def main():
             "Render → Environment."
         )
 
-    # Для сумісності з Python 3.14
+    # Совместимость с Python 3.14
     try:
         asyncio.get_event_loop()
 
