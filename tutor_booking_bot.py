@@ -426,6 +426,8 @@ async def clear_day(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ====================== ЗАПУСК ======================
+import asyncio
+asyncio.set_event_loop(asyncio.new_event_loop())
 
 def main():
     if BOT_TOKEN == "ВСТАВ_СЮДИ_СВІЙ_ТОКЕН":
