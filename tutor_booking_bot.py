@@ -496,9 +496,26 @@ async def receive_time(
         time_str
     )
 
-    if not data["slots"][day]:
+data["slots"][day].remove(time_str)
 
-        del data["slots"][day]
+selected_time = datetime.strptime(time_str, "%H:%M")
+lesson_end = selected_time + __import__("datetime").timedelta(minutes=60)
+
+remaining_times = []
+
+for slot in data["slots"][day]:
+    slot_time = datetime.strptime(slot, "%H:%M")
+
+    if (
+        slot_time >= lesson_end
+        or slot_time + __import__("datetime").timedelta(minutes=60) <= selected_time
+    ):
+        remaining_times.append(slot)
+
+data["slots"][day] = remaining_times
+
+if not data["slots"][day]:
+    del data["slots"][day]
 
     # Створюємо запис.
 
