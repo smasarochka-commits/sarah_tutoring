@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
 
-"""
-Telegram-бот для записи на уроки английского.
-
-Язык интерфейса: украинский.
-Продолжительность урока: 60 минут.
-Часовой пояс: Europe/Warsaw.
-"""
-
 import asyncio
 import json
 import logging
@@ -80,19 +72,16 @@ logger = logging.getLogger(__name__)
 
 
 # =========================================================
-# ГЛАВНОЕ МЕНЮ УЧЕНИКА
+# ГЛАВНОЕ МЕНЮ
 # =========================================================
 
-MENU = [
-    ["📝 Записатися"],
-    ["❌ Скасувати урок", "🔄 Перенести урок"],
-]
+def main_menu_keyboard():
 
-
-def menu_keyboard():
     return ReplyKeyboardMarkup(
-        MENU,
-        resize_keyboard=True
+        [
+            ["📝 Записатися"],
+        ],
+        resize_keyboard=True,
     )
 
 
@@ -101,23 +90,26 @@ def menu_keyboard():
 # =========================================================
 
 def now_local():
+
     return datetime.now(TIMEZONE)
 
 
 def slot_datetime(day, time_str):
+
     return datetime.strptime(
         f"{day} {time_str}",
-        "%Y-%m-%d %H:%M"
+        "%Y-%m-%d %H:%M",
     ).replace(
         tzinfo=TIMEZONE
     )
 
 
 def is_future_slot(day, time_str):
-    return slot_datetime(
-        day,
-        time_str
-    ) > now_local()
+
+    return (
+        slot_datetime(day, time_str)
+        > now_local()
+    )
 
 
 # =========================================================
@@ -133,14 +125,14 @@ def load_data():
             with open(
                 DATA_FILE,
                 "r",
-                encoding="utf-8"
+                encoding="utf-8",
             ) as f:
 
                 data = json.load(f)
 
         except (
             json.JSONDecodeError,
-            OSError
+            OSError,
         ) as e:
 
             logger.error(
@@ -156,18 +148,18 @@ def load_data():
 
     data.setdefault(
         "slots",
-        {}
+        {},
     )
 
     data.setdefault(
         "bookings",
-        []
+        [],
     )
 
     changed = False
 
     # Добавляем ID старым записям,
-    # если они были созданы до этой версии бота.
+    # если они были созданы до этой версии.
     for booking in data["bookings"]:
 
         if "id" not in booking:
@@ -176,8 +168,7 @@ def load_data():
 
             changed = True
 
-    # Удаляем из свободных слотов
-    # уже прошедшее время.
+    # Удаляем прошедшие свободные слоты.
     if clean_expired_slots(data):
 
         changed = True
@@ -194,14 +185,14 @@ def save_data(data):
     with open(
         DATA_FILE,
         "w",
-        encoding="utf-8"
+        encoding="utf-8",
     ) as f:
 
         json.dump(
             data,
             f,
             ensure_ascii=False,
-            indent=2
+            indent=2,
         )
 
 
@@ -218,21 +209,26 @@ def clean_expired_slots(data):
     ):
 
         future_times = [
+
             time
+
             for time in data["slots"][day]
+
             if is_future_slot(
                 day,
-                time
+                time,
             )
         ]
 
         if future_times:
 
+            future_times = sorted(
+                future_times
+            )
+
             if future_times != data["slots"][day]:
 
-                data["slots"][day] = sorted(
-                    future_times
-                )
+                data["slots"][day] = future_times
 
                 changed = True
 
@@ -246,7 +242,7 @@ def clean_expired_slots(data):
 
 
 # =========================================================
-# ФОРМАТИРОВАНИЕ ДАТ
+# ДНИ НЕДЕЛИ
 # =========================================================
 
 def format_day(day):
@@ -265,7 +261,7 @@ def format_day(day):
 
         dt = datetime.strptime(
             day,
-            "%Y-%m-%d"
+            "%Y-%m-%d",
         )
 
         return (
@@ -275,7 +271,7 @@ def format_day(day):
 
     except (
         ValueError,
-        TypeError
+        TypeError,
     ):
 
         return day
@@ -287,14 +283,14 @@ def format_date(day):
 
         return datetime.strptime(
             day,
-            "%Y-%m-%d"
+            "%Y-%m-%d",
         ).strftime(
             "%d.%m.%Y"
         )
 
     except (
         ValueError,
-        TypeError
+        TypeError,
     ):
 
         return day
@@ -306,7 +302,7 @@ def format_date(day):
 
 def upcoming_bookings_for_user(
     data,
-    user_id
+    user_id,
 ):
 
     bookings = [
@@ -319,17 +315,19 @@ def upcoming_bookings_for_user(
             booking.get("user_id") == user_id
             and is_future_slot(
                 booking["day"],
-                booking["time"]
+                booking["time"],
             )
         )
     ]
 
     return sorted(
+
         bookings,
+
         key=lambda booking:
             slot_datetime(
                 booking["day"],
-                booking["time"]
+                booking["time"],
             )
     )
 
@@ -344,51 +342,54 @@ def upcoming_all_bookings(data):
 
         if is_future_slot(
             booking["day"],
-            booking["time"]
+            booking["time"],
         )
     ]
 
     return sorted(
+
         bookings,
+
         key=lambda booking:
             slot_datetime(
                 booking["day"],
-                booking["time"]
+                booking["time"],
             )
     )
 
 
 # =========================================================
-# РАСПИСАНИЕ АДМИНА
+# ФОРМАТИРОВАНИЕ ЗАПИСЕЙ ДЛЯ АДМИНА
 # =========================================================
 
 def format_bookings_by_days(
     bookings,
-    title
 ):
 
     if not bookings:
 
         return (
-            f"{title}\n\n"
+            "📋 Майбутні записи:\n\n"
             "Немає майбутніх записів."
         )
 
     lines = [
-        title,
-        ""
+        "📋 Майбутні записи:",
+        "",
     ]
 
     current_day = None
 
     for booking in bookings:
 
-        if booking["day"] != current_day:
+        day = booking["day"]
 
-            current_day = booking["day"]
+        if day != current_day:
+
+            current_day = day
 
             lines.append(
-                f"📅 {format_day(current_day)}"
+                f"📅 {format_day(day)}"
             )
 
         lines.append(
@@ -401,7 +402,7 @@ def format_bookings_by_days(
 
 
 # =========================================================
-# СЛОТЫ
+# СВОБОДНЫЕ СЛОТЫ
 # =========================================================
 
 def get_free_days():
@@ -427,27 +428,31 @@ def get_free_times(day):
 
         for time in data["slots"].get(
             day,
-            []
+            [],
         )
 
         if is_future_slot(
             day,
-            time
+            time,
         )
     ]
 
     return sorted(times)
 
 
+# =========================================================
+# ПРОВЕРКА ПЕРЕСЕЧЕНИЯ СЛОТОВ
+# =========================================================
+
 def slot_overlaps_existing(
     day,
     new_time,
-    existing_times
+    existing_times,
 ):
 
     start = slot_datetime(
         day,
-        new_time
+        new_time,
     )
 
     end = (
@@ -457,11 +462,11 @@ def slot_overlaps_existing(
         )
     )
 
-    for other in existing_times:
+    for other_time in existing_times:
 
         other_start = slot_datetime(
             day,
-            other
+            other_time,
         )
 
         other_end = (
@@ -484,24 +489,19 @@ def slot_overlaps_existing(
 def add_slot_if_free(
     data,
     day,
-    time_str
+    time_str,
 ):
 
     if not is_future_slot(
         day,
-        time_str
+        time_str,
     ):
 
         return False
 
-    data.setdefault(
-        "slots",
-        {}
-    )
-
     data["slots"].setdefault(
         day,
-        []
+        [],
     )
 
     if time_str in data["slots"][day]:
@@ -511,7 +511,7 @@ def add_slot_if_free(
     if slot_overlaps_existing(
         day,
         time_str,
-        data["slots"][day]
+        data["slots"][day],
     ):
 
         return False
@@ -525,19 +525,23 @@ def add_slot_if_free(
     return True
 
 
+# =========================================================
+# УДАЛЕНИЕ ПЕРЕСЕКАЮЩИХСЯ СЛОТОВ
+# =========================================================
+
 def remove_overlapping_slots(
     data,
     day,
-    selected_time
+    selected_time,
 ):
 
-    selected = slot_datetime(
+    selected_start = slot_datetime(
         day,
-        selected_time
+        selected_time,
     )
 
-    lesson_end = (
-        selected
+    selected_end = (
+        selected_start
         + timedelta(
             minutes=LESSON_MINUTES
         )
@@ -547,12 +551,12 @@ def remove_overlapping_slots(
 
     for slot in data["slots"].get(
         day,
-        []
+        [],
     ):
 
         slot_start = slot_datetime(
             day,
-            slot
+            slot,
         )
 
         slot_end = (
@@ -563,13 +567,11 @@ def remove_overlapping_slots(
         )
 
         if (
-            slot_start >= lesson_end
-            or slot_end <= selected
+            slot_start >= selected_end
+            or slot_end <= selected_start
         ):
 
-            remaining.append(
-                slot
-            )
+            remaining.append(slot)
 
     if remaining:
 
@@ -581,17 +583,41 @@ def remove_overlapping_slots(
 
         data["slots"].pop(
             day,
-            None
+            None,
         )
 
 
 # =========================================================
-# START
+# СООБЩЕНИЕ АДМИНУ
+# =========================================================
+
+async def notify_admin(
+    context,
+    text,
+):
+
+    try:
+
+        await context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=text,
+        )
+
+    except Exception as e:
+
+        logger.error(
+            f"Не вдалося надіслати "
+            f"повідомлення адміну: {e}"
+        )
+
+
+# =========================================================
+# /START
 # =========================================================
 
 async def start(
     update: Update,
-    context: ContextTypes.DEFAULT_TYPE
+    context: ContextTypes.DEFAULT_TYPE,
 ):
 
     user = update.effective_user
@@ -601,24 +627,23 @@ async def start(
         f"Привіт, "
         f"{user.first_name}! 👋\n\n"
 
-        "Тут ти можеш:\n"
-        "📝 записатися на урок\n"
-        "❌ скасувати урок\n"
-        "🔄 перенести урок\n\n"
+        "Тут ти можеш "
+        "записатися на урок "
+        "англійської.\n\n"
 
         "Обери потрібну дію:",
 
-        reply_markup=menu_keyboard()
+        reply_markup=main_menu_keyboard(),
     )
 
 
 # =========================================================
-# НОВА ЗАПИСЬ
+# НАЧАЛО ЗАПИСИ
 # =========================================================
 
 async def book_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
+    update,
+    context,
 ):
 
     await update.message.reply_text(
@@ -626,15 +651,15 @@ async def book_command(
         "Будь ласка, "
         "напиши своє ім'я:",
 
-        reply_markup=menu_keyboard()
+        reply_markup=main_menu_keyboard(),
     )
 
     return WAITING_NAME
 
 
 async def start_booking_callback(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
+    update,
+    context,
 ):
 
     query = update.callback_query
@@ -649,9 +674,13 @@ async def start_booking_callback(
     return WAITING_NAME
 
 
+# =========================================================
+# ИМЯ
+# =========================================================
+
 async def receive_name(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
+    update,
+    context,
 ):
 
     name = update.message.text.strip()
@@ -676,7 +705,7 @@ async def receive_name(
             "😔 Зараз немає "
             "вільних віконець.",
 
-            reply_markup=menu_keyboard()
+            reply_markup=main_menu_keyboard(),
         )
 
         return ConversationHandler.END
@@ -689,7 +718,7 @@ async def receive_name(
             [
                 InlineKeyboardButton(
                     format_day(day),
-                    callback_data=f"day_{day}"
+                    callback_data=f"day_{day}",
                 )
             ]
         )
@@ -698,7 +727,7 @@ async def receive_name(
         [
             InlineKeyboardButton(
                 "❌ Скасувати",
-                callback_data="cancel"
+                callback_data="booking_cancel",
             )
         ]
     )
@@ -710,22 +739,26 @@ async def receive_name(
 
         reply_markup=InlineKeyboardMarkup(
             keyboard
-        )
+        ),
     )
 
     return WAITING_DAY
 
 
+# =========================================================
+# ВЫБОР ДНЯ
+# =========================================================
+
 async def receive_day(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
+    update,
+    context,
 ):
 
     query = update.callback_query
 
     await query.answer()
 
-    if query.data == "cancel":
+    if query.data == "booking_cancel":
 
         await query.edit_message_text(
             "Запис скасовано."
@@ -735,14 +768,12 @@ async def receive_day(
 
     day = query.data.replace(
         "day_",
-        ""
+        "",
     )
 
     context.user_data["day"] = day
 
-    free_times = get_free_times(
-        day
-    )
+    free_times = get_free_times(day)
 
     if not free_times:
 
@@ -764,7 +795,7 @@ async def receive_day(
         row.append(
             InlineKeyboardButton(
                 time,
-                callback_data=f"time_{time}"
+                callback_data=f"time_{time}",
             )
         )
 
@@ -781,7 +812,7 @@ async def receive_day(
         [
             InlineKeyboardButton(
                 "◀️ Назад",
-                callback_data="back_to_days"
+                callback_data="back_to_days",
             )
         ]
     )
@@ -790,7 +821,7 @@ async def receive_day(
         [
             InlineKeyboardButton(
                 "❌ Скасувати",
-                callback_data="cancel"
+                callback_data="booking_cancel",
             )
         ]
     )
@@ -802,15 +833,19 @@ async def receive_day(
 
         reply_markup=InlineKeyboardMarkup(
             keyboard
-        )
+        ),
     )
 
     return WAITING_TIME
 
 
+# =========================================================
+# НАЗАД К ДНЯМ
+# =========================================================
+
 async def back_to_days(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
+    update,
+    context,
 ):
 
     query = update.callback_query
@@ -836,7 +871,7 @@ async def back_to_days(
             [
                 InlineKeyboardButton(
                     format_day(day),
-                    callback_data=f"day_{day}"
+                    callback_data=f"day_{day}",
                 )
             ]
         )
@@ -845,7 +880,7 @@ async def back_to_days(
         [
             InlineKeyboardButton(
                 "❌ Скасувати",
-                callback_data="cancel"
+                callback_data="booking_cancel",
             )
         ]
     )
@@ -856,26 +891,26 @@ async def back_to_days(
 
         reply_markup=InlineKeyboardMarkup(
             keyboard
-        )
+        ),
     )
 
     return WAITING_DAY
 
 
 # =========================================================
-# БРОНИРОВАНИЕ ВРЕМЕНИ
+# ВЫБОР ВРЕМЕНИ И СОЗДАНИЕ ЗАПИСИ
 # =========================================================
 
 async def receive_time(
     update,
-    context
+    context,
 ):
 
     query = update.callback_query
 
     await query.answer()
 
-    if query.data == "cancel":
+    if query.data == "booking_cancel":
 
         await query.edit_message_text(
             "Запис скасовано."
@@ -883,14 +918,21 @@ async def receive_time(
 
         return ConversationHandler.END
 
+    if query.data == "back_to_days":
+
+        return await back_to_days(
+            update,
+            context,
+        )
+
     time_str = query.data.replace(
         "time_",
-        ""
+        "",
     )
 
     name = context.user_data.get(
         "name",
-        "Без імені"
+        "Без імені",
     )
 
     day = context.user_data.get(
@@ -907,24 +949,23 @@ async def receive_time(
         await query.edit_message_text(
 
             "😔 На жаль, "
-            "цей час щойно зайняли.\n"
+            "цей час щойно зайняли.\n\n"
             "Спробуй обрати інший."
         )
 
         return ConversationHandler.END
 
-    # Удаляем выбранный слот
+    # Удаляем выбранный слот.
     data["slots"][day].remove(
         time_str
     )
 
     # Удаляем все слоты,
-    # которые пересекаются
-    # с 60-минутным уроком.
+    # пересекающиеся с 60-минутным уроком.
     remove_overlapping_slots(
         data,
         day,
-        time_str
+        time_str,
     )
 
     booking = {
@@ -937,14 +978,15 @@ async def receive_time(
 
         "time": time_str,
 
-        "user_id": update.effective_user.id,
+        "user_id":
+            update.effective_user.id,
 
         "username":
             update.effective_user.username
             or "",
 
         "created_at":
-            now_local().isoformat()
+            now_local().isoformat(),
     }
 
     data["bookings"].append(
@@ -953,15 +995,30 @@ async def receive_time(
 
     save_data(data)
 
-    # Кнопка повторной записи
+    # =====================================================
+    # ТРИ КНОПКИ ПОСЛЕ УСПЕШНОЙ ЗАПИСИ
+    # =====================================================
+
     keyboard = [
 
         [
             InlineKeyboardButton(
                 "📝 Записатися ще раз",
-                callback_data="start_booking"
+                callback_data="start_booking",
             )
-        ]
+        ],
+
+        [
+            InlineKeyboardButton(
+                "❌ Скасувати урок",
+                callback_data="cancel_lesson",
+            ),
+
+            InlineKeyboardButton(
+                "🔄 Перенести урок",
+                callback_data="reschedule_lesson",
+            ),
+        ],
     ]
 
     await query.edit_message_text(
@@ -981,9 +1038,10 @@ async def receive_time(
 
         reply_markup=InlineKeyboardMarkup(
             keyboard
-        )
+        ),
     )
 
+    # Сообщение админу.
     await notify_admin(
 
         context,
@@ -999,7 +1057,7 @@ async def receive_time(
         f"Telegram: "
         f"@{booking['username'] or 'немає'}\n"
 
-        f"ID: {booking['user_id']}"
+        f"ID: {booking['user_id']}",
     )
 
     return ConversationHandler.END
@@ -1011,7 +1069,7 @@ async def receive_time(
 
 async def cancel_lesson_start(
     update,
-    context
+    context,
 ):
 
     user_id = update.effective_user.id
@@ -1020,7 +1078,7 @@ async def cancel_lesson_start(
 
     bookings = upcoming_bookings_for_user(
         data,
-        user_id
+        user_id,
     )
 
     if not bookings:
@@ -1030,7 +1088,7 @@ async def cancel_lesson_start(
             "У тебе немає "
             "майбутніх записів.",
 
-            reply_markup=menu_keyboard()
+            reply_markup=main_menu_keyboard(),
         )
 
         return ConversationHandler.END
@@ -1040,6 +1098,7 @@ async def cancel_lesson_start(
     for booking in bookings:
 
         keyboard.append(
+
             [
                 InlineKeyboardButton(
 
@@ -1048,7 +1107,7 @@ async def cancel_lesson_start(
 
                     callback_data=
                         f"cancel_booking:"
-                        f"{booking['id']}"
+                        f"{booking['id']}",
                 )
             ]
         )
@@ -1057,7 +1116,7 @@ async def cancel_lesson_start(
         [
             InlineKeyboardButton(
                 "◀️ Назад",
-                callback_data="cancel_flow_back"
+                callback_data="action_back",
             )
         ]
     )
@@ -1069,7 +1128,78 @@ async def cancel_lesson_start(
 
         reply_markup=InlineKeyboardMarkup(
             keyboard
+        ),
+    )
+
+    return CANCEL_SELECT
+
+
+async def cancel_lesson_callback(
+    update,
+    context,
+):
+
+    query = update.callback_query
+
+    await query.answer()
+
+    user_id = update.effective_user.id
+
+    data = load_data()
+
+    bookings = upcoming_bookings_for_user(
+        data,
+        user_id,
+    )
+
+    if not bookings:
+
+        await query.message.reply_text(
+
+            "У тебе немає "
+            "майбутніх записів.",
+
+            reply_markup=main_menu_keyboard(),
         )
+
+        return ConversationHandler.END
+
+    keyboard = []
+
+    for booking in bookings:
+
+        keyboard.append(
+
+            [
+                InlineKeyboardButton(
+
+                    f"{format_day(booking['day'])} "
+                    f"— {booking['time']}",
+
+                    callback_data=
+                        f"cancel_booking:"
+                        f"{booking['id']}",
+                )
+            ]
+        )
+
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                "◀️ Назад",
+                callback_data="action_back",
+            )
+        ]
+    )
+
+    await query.message.reply_text(
+
+        "Обери урок, "
+        "який хочеш скасувати:",
+
+        reply_markup=InlineKeyboardMarkup(
+            keyboard
+        ),
     )
 
     return CANCEL_SELECT
@@ -1077,20 +1207,12 @@ async def cancel_lesson_start(
 
 async def cancel_booking_callback(
     update,
-    context
+    context,
 ):
 
     query = update.callback_query
 
     await query.answer()
-
-    if query.data == "cancel_flow_back":
-
-        await query.edit_message_text(
-            "Обери потрібну дію в меню."
-        )
-
-        return ConversationHandler.END
 
     booking_id = query.data.split(
         ":",
@@ -1104,46 +1226,51 @@ async def cancel_booking_callback(
     booking = next(
 
         (
-            b
+            booking
 
-            for b in data["bookings"]
+            for booking in data["bookings"]
 
             if (
-                b.get("id") == booking_id
+                booking.get("id")
+                == booking_id
 
-                and b.get("user_id") == user_id
+                and booking.get("user_id")
+                == user_id
 
                 and is_future_slot(
-                    b["day"],
-                    b["time"]
+                    booking["day"],
+                    booking["time"],
                 )
             )
         ),
 
-        None
+        None,
     )
 
     if not booking:
 
-        await query.edit_message_text(
-            "Цей запис уже недоступний."
+        await query.message.reply_text(
+            "Цей запис уже недоступний.",
+            reply_markup=main_menu_keyboard(),
         )
 
         return ConversationHandler.END
 
     lesson_start = slot_datetime(
         booking["day"],
-        booking["time"]
+        booking["time"],
     )
 
     hours_left = (
+
         lesson_start - now_local()
+
     ).total_seconds() / 3600
 
     returned = False
 
-    # Если отмена минимум за 24 часа,
-    # возвращаем слот.
+    # Возвращаем слот,
+    # если до урока минимум 24 часа.
     if hours_left >= CANCEL_LIMIT_HOURS:
 
         returned = add_slot_if_free(
@@ -1152,10 +1279,9 @@ async def cancel_booking_callback(
 
             booking["day"],
 
-            booking["time"]
+            booking["time"],
         )
 
-    # Удаляем запись
     data["bookings"].remove(
         booking
     )
@@ -1164,28 +1290,28 @@ async def cancel_booking_callback(
 
     if returned:
 
-        slot_message = (
-            "Віконце знову стало "
-            "доступним для запису."
+        slot_text = (
+            "Віконце знову "
+            "доступне для запису."
         )
 
     else:
 
-        slot_message = (
+        slot_text = (
             "Віконце не повертається "
             "у вільний розклад."
         )
 
-    await query.edit_message_text(
+    await query.message.reply_text(
 
         f"❌ Урок скасовано.\n\n"
 
-        f"📅 "
-        f"{format_day(booking['day'])}\n"
-
+        f"📅 {format_day(booking['day'])}\n"
         f"🕐 {booking['time']}\n\n"
 
-        f"{slot_message}"
+        f"{slot_text}",
+
+        reply_markup=main_menu_keyboard(),
     )
 
     await notify_admin(
@@ -1201,7 +1327,7 @@ async def cancel_booking_callback(
         f"🕐 {booking['time']}\n\n"
 
         f"Повернено у вільні слоти: "
-        f"{'так' if returned else 'ні'}"
+        f"{'так' if returned else 'ні'}",
     )
 
     return ConversationHandler.END
@@ -1213,7 +1339,7 @@ async def cancel_booking_callback(
 
 async def reschedule_start(
     update,
-    context
+    context,
 ):
 
     user_id = update.effective_user.id
@@ -1222,7 +1348,7 @@ async def reschedule_start(
 
     bookings = upcoming_bookings_for_user(
         data,
-        user_id
+        user_id,
     )
 
     if not bookings:
@@ -1232,7 +1358,7 @@ async def reschedule_start(
             "У тебе немає "
             "майбутніх записів.",
 
-            reply_markup=menu_keyboard()
+            reply_markup=main_menu_keyboard(),
         )
 
         return ConversationHandler.END
@@ -1242,6 +1368,7 @@ async def reschedule_start(
     for booking in bookings:
 
         keyboard.append(
+
             [
                 InlineKeyboardButton(
 
@@ -1250,7 +1377,7 @@ async def reschedule_start(
 
                     callback_data=
                         f"transfer_booking:"
-                        f"{booking['id']}"
+                        f"{booking['id']}",
                 )
             ]
         )
@@ -1259,7 +1386,7 @@ async def reschedule_start(
         [
             InlineKeyboardButton(
                 "◀️ Назад",
-                callback_data="transfer_flow_back"
+                callback_data="action_back",
             )
         ]
     )
@@ -1271,7 +1398,78 @@ async def reschedule_start(
 
         reply_markup=InlineKeyboardMarkup(
             keyboard
+        ),
+    )
+
+    return TRANSFER_SELECT
+
+
+async def reschedule_lesson_callback(
+    update,
+    context,
+):
+
+    query = update.callback_query
+
+    await query.answer()
+
+    user_id = update.effective_user.id
+
+    data = load_data()
+
+    bookings = upcoming_bookings_for_user(
+        data,
+        user_id,
+    )
+
+    if not bookings:
+
+        await query.message.reply_text(
+
+            "У тебе немає "
+            "майбутніх записів.",
+
+            reply_markup=main_menu_keyboard(),
         )
+
+        return ConversationHandler.END
+
+    keyboard = []
+
+    for booking in bookings:
+
+        keyboard.append(
+
+            [
+                InlineKeyboardButton(
+
+                    f"{format_day(booking['day'])} "
+                    f"— {booking['time']}",
+
+                    callback_data=
+                        f"transfer_booking:"
+                        f"{booking['id']}",
+                )
+            ]
+        )
+
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                "◀️ Назад",
+                callback_data="action_back",
+            )
+        ]
+    )
+
+    await query.message.reply_text(
+
+        "Обери урок, "
+        "який хочеш перенести:",
+
+        reply_markup=InlineKeyboardMarkup(
+            keyboard
+        ),
     )
 
     return TRANSFER_SELECT
@@ -1279,20 +1477,12 @@ async def reschedule_start(
 
 async def transfer_booking_callback(
     update,
-    context
+    context,
 ):
 
     query = update.callback_query
 
     await query.answer()
-
-    if query.data == "transfer_flow_back":
-
-        await query.edit_message_text(
-            "Обери потрібну дію в меню."
-        )
-
-        return ConversationHandler.END
 
     booking_id = query.data.split(
         ":",
@@ -1306,29 +1496,32 @@ async def transfer_booking_callback(
     booking = next(
 
         (
-            b
+            booking
 
-            for b in data["bookings"]
+            for booking in data["bookings"]
 
             if (
-                b.get("id") == booking_id
+                booking.get("id")
+                == booking_id
 
-                and b.get("user_id") == user_id
+                and booking.get("user_id")
+                == user_id
 
                 and is_future_slot(
-                    b["day"],
-                    b["time"]
+                    booking["day"],
+                    booking["time"],
                 )
             )
         ),
 
-        None
+        None,
     )
 
     if not booking:
 
-        await query.edit_message_text(
-            "Цей запис уже недоступний."
+        await query.message.reply_text(
+            "Цей запис уже недоступний.",
+            reply_markup=main_menu_keyboard(),
         )
 
         return ConversationHandler.END
@@ -1341,11 +1534,13 @@ async def transfer_booking_callback(
 
     if not free_days:
 
-        await query.edit_message_text(
+        await query.message.reply_text(
 
             "😔 Зараз немає "
             "вільних слотів "
-            "для перенесення."
+            "для перенесення.",
+
+            reply_markup=main_menu_keyboard(),
         )
 
         return ConversationHandler.END
@@ -1355,22 +1550,32 @@ async def transfer_booking_callback(
     for day in free_days:
 
         keyboard.append(
+
             [
                 InlineKeyboardButton(
                     format_day(day),
                     callback_data=
-                        f"transfer_day:{day}"
+                        f"transfer_day:{day}",
                 )
             ]
         )
 
-    await query.edit_message_text(
+    keyboard.append(
+        [
+            InlineKeyboardButton(
+                "◀️ Назад",
+                callback_data="action_back",
+            )
+        ]
+    )
+
+    await query.message.reply_text(
 
         "Обери новий день:",
 
         reply_markup=InlineKeyboardMarkup(
             keyboard
-        )
+        ),
     )
 
     return TRANSFER_TIME
@@ -1378,7 +1583,7 @@ async def transfer_booking_callback(
 
 async def transfer_day_callback(
     update,
-    context
+    context,
 ):
 
     query = update.callback_query
@@ -1387,17 +1592,14 @@ async def transfer_day_callback(
 
     day = query.data.replace(
         "transfer_day:",
-        ""
+        "",
     )
 
-    times = get_free_times(
-        day
-    )
+    times = get_free_times(day)
 
     if not times:
 
-        await query.edit_message_text(
-
+        await query.message.reply_text(
             "😔 На цей день уже немає "
             "вільних місць."
         )
@@ -1421,7 +1623,7 @@ async def transfer_day_callback(
                 callback_data=
                     f"transfer_time:"
                     f"{day}:"
-                    f"{time}"
+                    f"{time}",
             )
         )
 
@@ -1438,20 +1640,19 @@ async def transfer_day_callback(
         [
             InlineKeyboardButton(
                 "◀️ Назад",
-                callback_data=
-                    "transfer_booking_back"
+                callback_data="action_back",
             )
         ]
     )
 
-    await query.edit_message_text(
+    await query.message.reply_text(
 
         f"Обери новий час "
         f"на {format_date(day)}:",
 
         reply_markup=InlineKeyboardMarkup(
             keyboard
-        )
+        ),
     )
 
     return TRANSFER_TIME
@@ -1459,24 +1660,30 @@ async def transfer_day_callback(
 
 async def transfer_time_callback(
     update,
-    context
+    context,
 ):
 
     query = update.callback_query
 
     await query.answer()
 
-    if query.data == "transfer_booking_back":
+    if query.data == "action_back":
 
-        return await reschedule_start_from_callback(
-            update,
-            context
+        await query.message.reply_text(
+            "Обери потрібну дію:",
+            reply_markup=main_menu_keyboard(),
         )
 
-    _, day, new_time = query.data.split(
+        return ConversationHandler.END
+
+    parts = query.data.split(
         ":",
         2
     )
+
+    day = parts[1]
+
+    new_time = parts[2]
 
     booking_id = context.user_data.get(
         "transfer_booking_id"
@@ -1489,41 +1696,42 @@ async def transfer_time_callback(
     booking = next(
 
         (
-            b
+            booking
 
-            for b in data["bookings"]
+            for booking in data["bookings"]
 
             if (
-                b.get("id") == booking_id
+                booking.get("id")
+                == booking_id
 
-                and b.get("user_id") == user_id
+                and booking.get("user_id")
+                == user_id
 
                 and is_future_slot(
-                    b["day"],
-                    b["time"]
+                    booking["day"],
+                    booking["time"],
                 )
             )
         ),
 
-        None
+        None,
     )
 
     if not booking:
 
-        await query.edit_message_text(
-            "Цей запис уже недоступний."
+        await query.message.reply_text(
+            "Цей запис уже недоступний.",
+            reply_markup=main_menu_keyboard(),
         )
 
         return ConversationHandler.END
 
     if (
         day not in data["slots"]
-
-        or new_time
-        not in data["slots"][day]
+        or new_time not in data["slots"][day]
     ):
 
-        await query.edit_message_text(
+        await query.message.reply_text(
 
             "😔 Цей час щойно зайняли.\n"
             "Спробуй інший час."
@@ -1537,30 +1745,31 @@ async def transfer_time_callback(
 
     old_start = slot_datetime(
         old_day,
-        old_time
+        old_time,
     )
 
     hours_left = (
+
         old_start - now_local()
+
     ).total_seconds() / 3600
 
-    # Удаляем новый выбранный слот
+    # Забираем новый слот.
     data["slots"][day].remove(
         new_time
     )
 
-    # Удаляем пересекающиеся
-    # с новым уроком слоты
+    # Убираем пересекающиеся слоты.
     remove_overlapping_slots(
         data,
         day,
-        new_time
+        new_time,
     )
 
     returned = False
 
-    # Если перенос минимум за 24 часа,
-    # возвращаем старое окно.
+    # Возвращаем старый слот,
+    # если перенос сделан минимум за 24 часа.
     if hours_left >= CANCEL_LIMIT_HOURS:
 
         returned = add_slot_if_free(
@@ -1569,10 +1778,10 @@ async def transfer_time_callback(
 
             old_day,
 
-            old_time
+            old_time,
         )
 
-    # Обновляем существующее бронирование
+    # Меняем существующую запись.
     booking["day"] = day
 
     booking["time"] = new_time
@@ -1585,19 +1794,43 @@ async def transfer_time_callback(
 
     if returned:
 
-        old_slot_message = (
+        old_slot_text = (
             "Старе віконце знову "
             "доступне для запису."
         )
 
     else:
 
-        old_slot_message = (
+        old_slot_text = (
             "Старе віконце "
             "не повертається."
         )
 
-    await query.edit_message_text(
+    # После переноса снова показываем
+    # три кнопки.
+    keyboard = [
+
+        [
+            InlineKeyboardButton(
+                "📝 Записатися ще раз",
+                callback_data="start_booking",
+            )
+        ],
+
+        [
+            InlineKeyboardButton(
+                "❌ Скасувати урок",
+                callback_data="cancel_lesson",
+            ),
+
+            InlineKeyboardButton(
+                "🔄 Перенести урок",
+                callback_data="reschedule_lesson",
+            ),
+        ],
+    ]
+
+    await query.message.reply_text(
 
         f"✅ Урок перенесено!\n\n"
 
@@ -1607,7 +1840,11 @@ async def transfer_time_callback(
         f"🕐 Новий час: "
         f"{new_time}\n\n"
 
-        f"{old_slot_message}"
+        f"{old_slot_text}",
+
+        reply_markup=InlineKeyboardMarkup(
+            keyboard
+        ),
     )
 
     await notify_admin(
@@ -1627,99 +1864,42 @@ async def transfer_time_callback(
         f"🕐 {new_time}\n\n"
 
         f"Старе віконце повернено: "
-        f"{'так' if returned else 'ні'}"
+        f"{'так' if returned else 'ні'}",
     )
 
     return ConversationHandler.END
 
 
-async def reschedule_start_from_callback(
+# =========================================================
+# НАЗАД ИЗ ОТМЕНЫ/ПЕРЕНОСА
+# =========================================================
+
+async def action_back(
     update,
-    context
+    context,
 ):
 
     query = update.callback_query
 
-    user_id = update.effective_user.id
+    await query.answer()
 
-    data = load_data()
+    await query.message.reply_text(
 
-    bookings = upcoming_bookings_for_user(
-        data,
-        user_id
+        "Обери потрібну дію:",
+
+        reply_markup=main_menu_keyboard(),
     )
 
-    if not bookings:
-
-        await query.edit_message_text(
-            "У тебе немає "
-            "майбутніх записів."
-        )
-
-        return ConversationHandler.END
-
-    keyboard = []
-
-    for booking in bookings:
-
-        keyboard.append(
-            [
-                InlineKeyboardButton(
-
-                    f"{format_day(booking['day'])} "
-                    f"— {booking['time']}",
-
-                    callback_data=
-                        f"transfer_booking:"
-                        f"{booking['id']}"
-                )
-            ]
-        )
-
-    await query.edit_message_text(
-
-        "Обери урок, "
-        "який хочеш перенести:",
-
-        reply_markup=InlineKeyboardMarkup(
-            keyboard
-        )
-    )
-
-    return TRANSFER_SELECT
+    return ConversationHandler.END
 
 
 # =========================================================
-# СООБЩЕНИЕ АДМИНУ
-# =========================================================
-
-async def notify_admin(
-    context,
-    text
-):
-
-    try:
-
-        await context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=text
-        )
-
-    except Exception as e:
-
-        logger.error(
-            f"Не вдалося надіслати "
-            f"повідомлення адміну: {e}"
-        )
-
-
-# =========================================================
-# КОМАНДА /SLOTS
+# АДМИН: /SLOTS
 # =========================================================
 
 async def admin_slots(
     update,
-    context
+    context,
 ):
 
     if update.effective_user.id != ADMIN_ID:
@@ -1738,7 +1918,7 @@ async def admin_slots(
 
     lines = [
         "📅 Вільні віконця:",
-        ""
+        "",
     ]
 
     for day in sorted(
@@ -1763,12 +1943,12 @@ async def admin_slots(
 
 
 # =========================================================
-# КОМАНДА /BOOKINGS
+# АДМИН: /BOOKINGS
 # =========================================================
 
 async def admin_bookings(
     update,
-    context
+    context,
 ):
 
     if update.effective_user.id != ADMIN_ID:
@@ -1781,25 +1961,21 @@ async def admin_bookings(
         data
     )
 
-    text = format_bookings_by_days(
-
-        bookings,
-
-        "📋 Майбутні записи:"
-    )
-
     await update.message.reply_text(
-        text
+
+        format_bookings_by_days(
+            bookings
+        )
     )
 
 
 # =========================================================
-# /ADDSLOT
+# АДМИН: /ADDSLOT
 # =========================================================
 
 async def add_slot(
     update,
-    context
+    context,
 ):
 
     if update.effective_user.id != ADMIN_ID:
@@ -1817,17 +1993,17 @@ async def add_slot(
 
         await update.message.reply_text(
 
-            "Використання:\n"
+            "Використання:\n\n"
 
             "/addslot "
             "РРРР-ММ-ДД "
             "ЧАС1 ЧАС2 ...\n\n"
 
-            "Приклад:\n"
+            "Наприклад:\n"
 
             "/addslot "
-            "2026-10-07 "
-            "19:00 19:30 20:00"
+            "2026-10-11 "
+            "09:00 10:00 11:00"
         )
 
         return
@@ -1838,27 +2014,22 @@ async def add_slot(
 
         datetime.strptime(
             day,
-            "%Y-%m-%d"
+            "%Y-%m-%d",
         )
 
     except ValueError:
 
         await update.message.reply_text(
 
-            "Неправильний формат дати.\n"
+            "❌ Неправильний формат дати.\n\n"
 
-            "Використовуй "
-            "РРРР-ММ-ДД."
+            "Використовуй:\n"
+            "РРРР-ММ-ДД"
         )
 
         return
 
     data = load_data()
-
-    data["slots"].setdefault(
-        day,
-        []
-    )
 
     added = []
 
@@ -1868,7 +2039,7 @@ async def add_slot(
 
             datetime.strptime(
                 time,
-                "%H:%M"
+                "%H:%M",
             )
 
         except ValueError:
@@ -1879,7 +2050,7 @@ async def add_slot(
 
             data,
             day,
-            time
+            time,
         ):
 
             added.append(time)
@@ -1890,12 +2061,11 @@ async def add_slot(
 
         await update.message.reply_text(
 
-            f"✅ Додано на "
-            f"{format_day(day)}:\n"
+            f"✅ Додано:\n\n"
 
-            +
+            f"📅 {format_day(day)}\n\n"
 
-            "\n".join(
+            + "\n".join(
                 f"• {time}"
                 for time in added
             )
@@ -1905,7 +2075,7 @@ async def add_slot(
 
         await update.message.reply_text(
 
-            "Нічого не додано.\n"
+            "Нічого не додано.\n\n"
 
             "Можливо, ці години вже "
             "існують, перетинаються "
@@ -1914,12 +2084,12 @@ async def add_slot(
 
 
 # =========================================================
-# /CLEARDAY
+# АДМИН: /CLEARDAY
 # =========================================================
 
 async def clear_day(
     update,
-    context
+    context,
 ):
 
     if update.effective_user.id != ADMIN_ID:
@@ -1930,7 +2100,7 @@ async def clear_day(
 
         await update.message.reply_text(
 
-            "Використання:\n"
+            "Використання:\n\n"
             "/clearday РРРР-ММ-ДД"
         )
 
@@ -1948,7 +2118,7 @@ async def clear_day(
 
         await update.message.reply_text(
 
-            f"Слоти на "
+            f"🗑️ Слоти на "
             f"{format_day(day)} "
             f"видалено."
         )
@@ -1967,13 +2137,17 @@ async def clear_day(
 
 async def cancel_command(
     update,
-    context
+    context,
 ):
 
-    return await cancel_lesson_start(
-        update,
-        context
+    await update.message.reply_text(
+
+        "Дію скасовано.",
+
+        reply_markup=main_menu_keyboard(),
     )
+
+    return ConversationHandler.END
 
 
 # =========================================================
@@ -1986,14 +2160,13 @@ def main():
 
         raise RuntimeError(
 
-            "BOT_TOKEN не знайдено. "
+            "BOT_TOKEN не знайдено.\n"
 
-            "Додай BOT_TOKEN у "
-
+            "Додай BOT_TOKEN у:\n"
             "Render → Environment."
         )
 
-    # Совместимость с Python 3.14
+    # Совместимость с Python 3.14.
     try:
 
         asyncio.get_event_loop()
@@ -2011,213 +2184,261 @@ def main():
         .build()
     )
 
+
+    # =====================================================
+    # ОСНОВНОЙ CONVERSATION HANDLER
+    # =====================================================
+
     conversation = ConversationHandler(
 
         entry_points=[
 
-            # Новая запись
+            # -------------------------
+            # НОВАЯ ЗАПИСЬ
+            # -------------------------
+
             CommandHandler(
                 "book",
-                book_command
+                book_command,
             ),
 
             MessageHandler(
                 filters.Regex(
                     "^📝 Записатися$"
                 ),
-                book_command
+                book_command,
             ),
 
             CallbackQueryHandler(
                 start_booking_callback,
-                pattern="^start_booking$"
+                pattern="^start_booking$",
             ),
 
-            # Отмена
+
+            # -------------------------
+            # ОТМЕНА УЖЕ СУЩЕСТВУЮЩЕГО УРОКА
+            # -------------------------
+
+            CallbackQueryHandler(
+                cancel_lesson_callback,
+                pattern="^cancel_lesson$",
+            ),
+
             MessageHandler(
                 filters.Regex(
                     "^❌ Скасувати урок$"
                 ),
-                cancel_lesson_start
+                cancel_lesson_start,
             ),
 
-            # Перенос
+
+            # -------------------------
+            # ПЕРЕНОС УЖЕ СУЩЕСТВУЮЩЕГО УРОКА
+            # -------------------------
+
+            CallbackQueryHandler(
+                reschedule_lesson_callback,
+                pattern="^reschedule_lesson$",
+            ),
+
             MessageHandler(
                 filters.Regex(
                     "^🔄 Перенести урок$"
                 ),
-                reschedule_start
+                reschedule_start,
             ),
         ],
 
+
         states={
 
-            # =========================================
-            # НОВАЯ ЗАПИСЬ
-            # =========================================
+            # =================================================
+            # ЗАПИСЬ
+            # =================================================
 
             WAITING_NAME: [
 
                 MessageHandler(
                     filters.TEXT
                     & ~filters.COMMAND,
-                    receive_name
-                )
+                    receive_name,
+                ),
             ],
+
 
             WAITING_DAY: [
 
                 CallbackQueryHandler(
                     receive_day,
-                    pattern="^day_"
+                    pattern="^day_",
                 ),
 
                 CallbackQueryHandler(
-                    lambda update, context:
-                        cancel_callback(
-                            update,
-                            context
-                        ),
-                    pattern="^cancel$"
+                    receive_day,
+                    pattern="^booking_cancel$",
                 ),
             ],
+
 
             WAITING_TIME: [
 
                 CallbackQueryHandler(
                     receive_time,
-                    pattern="^time_"
+                    pattern="^time_",
                 ),
 
                 CallbackQueryHandler(
                     back_to_days,
-                    pattern="^back_to_days$"
+                    pattern="^back_to_days$",
                 ),
 
                 CallbackQueryHandler(
-                    lambda update, context:
-                        cancel_callback(
-                            update,
-                            context
-                        ),
-                    pattern="^cancel$"
+                    receive_time,
+                    pattern="^booking_cancel$",
                 ),
             ],
 
-            # =========================================
+
+            # =================================================
             # ОТМЕНА
-            # =========================================
+            # =================================================
 
             CANCEL_SELECT: [
 
                 CallbackQueryHandler(
                     cancel_booking_callback,
-                    pattern="^cancel_booking:"
+                    pattern="^cancel_booking:",
                 ),
 
                 CallbackQueryHandler(
-                    cancel_booking_callback,
-                    pattern="^cancel_flow_back$"
+                    action_back,
+                    pattern="^action_back$",
                 ),
             ],
 
-            # =========================================
-            # ПЕРЕНОС
-            # =========================================
+
+            # =================================================
+            # ПЕРЕНОС — ВЫБОР СТАРОГО УРОКА
+            # =================================================
 
             TRANSFER_SELECT: [
 
                 CallbackQueryHandler(
                     transfer_booking_callback,
-                    pattern="^transfer_booking:"
+                    pattern="^transfer_booking:",
                 ),
 
                 CallbackQueryHandler(
-                    transfer_booking_callback,
-                    pattern="^transfer_flow_back$"
+                    action_back,
+                    pattern="^action_back$",
                 ),
             ],
+
+
+            # =================================================
+            # ПЕРЕНОС — ВЫБОР НОВОГО ВРЕМЕНИ
+            # =================================================
 
             TRANSFER_TIME: [
 
                 CallbackQueryHandler(
-                    transfer_time_callback,
-                    pattern="^transfer_time:"
-                ),
-
-                CallbackQueryHandler(
                     transfer_day_callback,
-                    pattern="^transfer_day:"
+                    pattern="^transfer_day:",
                 ),
 
                 CallbackQueryHandler(
                     transfer_time_callback,
-                    pattern="^transfer_booking_back$"
+                    pattern="^transfer_time:",
+                ),
+
+                CallbackQueryHandler(
+                    action_back,
+                    pattern="^action_back$",
                 ),
             ],
         },
+
 
         fallbacks=[
 
             CommandHandler(
                 "cancel",
-                cancel_command
-            )
+                cancel_command,
+            ),
         ],
 
-        allow_reentry=True
+
+        allow_reentry=True,
     )
 
-    # /start
+
+    # =====================================================
+    # /START
+    # =====================================================
+
     app.add_handler(
         CommandHandler(
             "start",
-            start
+            start,
         )
     )
 
-    # Основной ConversationHandler
+
+    # =====================================================
+    # ОСНОВНОЙ HANDLER
+    # =====================================================
+
     app.add_handler(
         conversation
     )
 
-    # Админские команды
+
+    # =====================================================
+    # АДМИНСКИЕ КОМАНДЫ
+    # =====================================================
+
     app.add_handler(
         CommandHandler(
             "addslot",
-            add_slot
+            add_slot,
         )
     )
 
     app.add_handler(
         CommandHandler(
             "slots",
-            admin_slots
+            admin_slots,
         )
     )
 
     app.add_handler(
         CommandHandler(
             "bookings",
-            admin_bookings
+            admin_bookings,
         )
     )
 
     app.add_handler(
         CommandHandler(
             "clearday",
-            clear_day
+            clear_day,
         )
     )
+
 
     print(
         "Бот запущений..."
     )
 
+
     app.run_polling(
         allowed_updates=Update.ALL_TYPES
     )
 
+
+# =========================================================
+# START PROGRAM
+# =========================================================
 
 if __name__ == "__main__":
 
